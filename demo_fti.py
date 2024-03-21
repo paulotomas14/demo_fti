@@ -32,7 +32,7 @@ from colorama import Fore,Style
 
 from callback_handler import CustomStreamingStdOutCallbackHandler
 
-from configuration import VERBOSE, TIMEOUT, discussion_floor, discussion_ceil
+from configuration import VERBOSE, TIMEOUT, discussion_floor, discussion_ceil, use_bots
 from configuration import IDLE_MIN, IDLE_MAX, LISTEN_MIN, LISTEN_MAX, LINE_WAIT
 from configuration import language, furhat_hosts, furhat_listening_coordinates, furhat_listening_animations , furhat_idle_animations , endpoint 
 
@@ -60,16 +60,17 @@ class DialogueManager(BaseModel):
 
 
     def get_personalities(self, topic, llm):
-        input = f"""This is the topic I want to discuss: {topic}. Please chose two personalities,
-    from real history, who would enact the most entertaining debate on this topic. 
-    As such they must share some contradictory views on the topic.
-    Please respond in the following format:
-    Final Answer: Personality_1(gender);Personality_2(gender)
-    EXAMPLE:
-    The topic is physics. Hence, I believe the two best personalities 
-    to cover this debate are two of the most influential physicists in history.
-    Final Answer: Isaac Newton(male); Albert Einstein(female)
-    END OF EXAMPLE"""
+        input = f"""This is the topic I want to discuss: {topic}. Please chose two personalities 
+with oposing views on the subject, from real history, who would enact the most entertaining
+debate on this topic. 
+As such they must share some contradictory views on the topic.
+Please respond in the following format:
+Final Answer: Personality_1(gender);Personality_2(gender)
+EXAMPLE:
+The topic is physics. Hence, I believe the two best personalities 
+to cover this debate are two of the most influential physicists in history.
+Final Answer: Isaac Newton(male); Albert Einstein(female)
+END OF EXAMPLE"""
         
        
         res = llm.invoke(input).content
@@ -132,13 +133,6 @@ class DialogueManager(BaseModel):
 
         return res, start, agent
 
-
-
-
-
-
-
-
     def get_dialogue(self, topic, llm):
     
         agent_list = list(self.agents.items())
@@ -146,16 +140,19 @@ class DialogueManager(BaseModel):
         agent_1 = agent_list[0][0]
         agent_2 = agent_list[1][0]
         input = f"""A debate for the ages. On "{topic}", two heavy hiters will debate: {agent_1} and {agent_2}.
-    Write a fun discussion between these two personalities, as if they were having it right now. They must be consistent with their real beliefs,
-    and address each other to confront their ideas.
+    Write a fun discussion between these two personalities, as if they were having it right now. 
+    They must be consistent with their real beliefs, and defend oposing views.
+    They must confront each other's their ideas. Do not paraphrase or address 
+    the participants by their names, use pronouns instead.
     You must provide this debate in the following format:
-    {agent_1} : argument(at most 30 words).
-    {agent_2} : argument(at most 30 words).
-    (...)
-    This debate must be around {discussion_floor} to {discussion_ceil} lines long,
-    and the arguments must flow coherently from one to the next. 
-    Terminate the debate politely.
-    Do not forget polite introductions and goodbyes.
+    {agent_1} : greeting(a polite introduction).
+    {agent_2} : greeting(a polite introduction).
+    from {discussion_floor} to {discussion_ceil} times:
+        {agent_1} : argument(at most 20 words).
+        {agent_2} : argument(at most 20 words).
+    {agent_1} : greeting(a polite goodbye).
+    {agent_2} : greeting(a polite goodbye).
+    The arguments must flow coherently from one to the next. 
     The debate must be informative, and interesting. 
     """
         if language.lower()=="dutch":
@@ -207,7 +204,12 @@ class DialogueManager(BaseModel):
         return True
     
     def get_agent(self, index, personality):
-
+        furhat  = None
+        voice_name = ""
+        face_name = ""
+        listenning_coors = ""
+        direction = ""
+        color = ""
         try:
             host = furhat_hosts[index]
             listenning_coors = furhat_listening_coordinates[index]
@@ -217,8 +219,10 @@ class DialogueManager(BaseModel):
             face_name = random.choice(FACES[gender])
             if index==0:
                 direction = "left"
+                color=[0,250,70]
             else:
                 direction = "right"
+                color = [0,70,250]
         except ValueError:
             furhat = None
             voice_name = ""
@@ -231,7 +235,7 @@ class DialogueManager(BaseModel):
             furhat = None
             voice_name = ""
             return None
-        return {personality[0] : {"gender": personality[1], "furhat": furhat, "voice": voice_name, "face": face_name, "list_coords": listenning_coors, "direction": direction}}
+        return {personality[0] : {"gender": personality[1], "furhat": furhat, "voice": voice_name, "face": face_name, "list_coords": listenning_coors, "direction": direction, "color": color}}
 
 
 def get_opposing_agent_name(agent_name,agents):
@@ -263,25 +267,30 @@ def clear_screen_http_req():
     """{"text": "hello", "name":"Bob", "type":"left", "metadata":"Dogs"}"""
     
     # sending post request and saving response as response object
-    print(f"endpoint = {endpoint}")
     r = requests.delete(url=endpoint, headers={})
     code = r.status_code
     print(f"Status:{code}")
     print(f"text :{r.text}")
 
-def led_flicker(furhat):
-    furhat.set_led(red=250, green=250, blue=250)
+def led_flicker(furhat, color):
+    furhat.set_led(red=color[0], green=color[1], blue=color[2])
     time.sleep(0.2)
-    furhat.set_led(red=100, green=100, blue=100)
+    furhat.set_led(red=int(color[0]/2.0), green=int(color[1]/2.0), blue=int(color[2]/2.0))
     time.sleep(0.2)
-    furhat.set_led(red=250, green=250, blue=250)
+    furhat.set_led(red=color[0], green=color[1], blue=color[2])
 
 
 def speak(p_queue, agents, topic):
-    line = "something"
-    clear_screen_http_req()
-    while line != None:
 
+    line = "something"
+    if requests:
+        try:
+            clear_screen_http_req()
+        except Exception:
+            print("NO HTTP SERVER")
+
+
+    while line != None:
         dialogue = p_queue.get()
 
         if dialogue is not None:
@@ -290,47 +299,48 @@ def speak(p_queue, agents, topic):
             ag_opposing_name = get_opposing_agent_name(ag_name,agents)
             ag = agents.get(ag_name)
             opposing_ag = agents.get(ag_opposing_name)
-            if ag and opposing_ag:
-                furhat = ag.get("furhat")
-                opposing_furhat = opposing_ag.get("furhat")
-                if furhat and opposing_furhat:
-                    
-                    opposing_furhat.set_voice(name= opposing_ag["voice"])
-                    opposing_furhat.set_face(character= opposing_ag["face"],  mask="adult")
-                    opposing_furhat.set_led(red=0, green=0, blue=0)
-                    opposing_furhat.attend(location=opposing_ag["list_coords"])
+            if use_bots:
+                if ag and opposing_ag:
+                    furhat = ag.get("furhat")
+                    opposing_furhat = opposing_ag.get("furhat")
+                    if furhat and opposing_furhat:
+                        
+                        opposing_furhat.set_voice(name= opposing_ag["voice"])
+                        opposing_furhat.set_face(character= opposing_ag["face"],  mask="adult")
+                        opposing_furhat.set_led(red=0, green=0, blue=0)
+                        opposing_furhat.attend(location=opposing_ag["list_coords"])
 
 
-                    #print(ag["voice"])
+                        #print(ag["voice"])
 
-                    time.sleep(LINE_WAIT)
-                    led_flicker(furhat)
-                    furhat.set_voice(name=ag["voice"])
-                    furhat.set_face(character=ag["face"], mask="adult")
-                    #fade_leds(MIN, MAX, TIME)
+                        time.sleep(LINE_WAIT)
+                        led_flicker(furhat, ag["color"])
+                        furhat.set_voice(name=ag["voice"])
+                        furhat.set_face(character=ag["face"], mask="adult")
+                        furhat.attend(location=ag["list_coords"])
 
-                    furhat.attend(location=ag["list_coords"])
+                        procs = []
 
+                        p = multiprocessing.Process(target=listening, args=(opposing_furhat,))
+                        procs.append(p)
+                        p.start()
 
+                        direction = ag.get("direction")
+                        if requests:
+                            try:
+                                send_message_to_screen_http_req(topic, line, ag_name, direction)
+                            except Exception:
+                                print("NO HTTP SERVER")
+                        print(Fore.BLUE + ag_name + " : " + line, end="", flush=True)
+                        print(Style.RESET_ALL)
+                        
+                        furhat.say(text=line, blocking=True)
 
-
-                    
-
-                    procs = []
-
-                    p = multiprocessing.Process(target=listening, args=(opposing_furhat,))
-                    procs.append(p)
-                    p.start()
-
-                    direction = ag.get("direction")
-                    send_message_to_screen_http_req(topic, line, ag_name, direction)
-                    print(Fore.BLUE + ag_name + " : " + line, end="", flush=True)
-                    print(Style.RESET_ALL)
-                    
-                    furhat.say(text=line, blocking=True)
-
-                    terminate_procs(procs)
-                
+                        terminate_procs(procs)
+            elif line is not None:
+                time.sleep(2)
+                print(Fore.BLUE + ag_name + " : " + line, end="", flush=True)
+                print(Style.RESET_ALL)
 
 def play_idle_animations(furhat):
     time.sleep(random.randint(IDLE_MIN,IDLE_MAX))
@@ -352,7 +362,10 @@ def play_listening_animations(furhat):
         
 
 def idle():
-    furhats = [FurhatRemoteAPI(host) for host in furhat_hosts] 
+    try:
+        furhats = [FurhatRemoteAPI(host) for host in furhat_hosts] 
+    except Exception:
+        return
 
     while True:
         for furhat in furhats:
@@ -407,14 +420,15 @@ if __name__=="__main__":
         callbacks=[CustomStreamingStdOutCallbackHandler()] )# Can be any LLM you want.
     
     LLM = ChatOpenAI(temperature=0.9, max_tokens=4096, verbose = VERBOSE, model_name='gpt-3.5-turbo', request_timeout = TIMEOUT)# Can be any LLM you want.
-    dm = DialogueManager()
-    p_queue = multiprocessing.Queue()
-    dm.p_queue = p_queue
+    
 
     topic = ""
     while topic.lower() != "exit":
-
+        dm = DialogueManager()
+        p_queue = multiprocessing.Queue()
+        dm.p_queue = p_queue
         processes = []
+
 
         p = multiprocessing.Process(target=idle, args=())
         processes.append(p)
@@ -425,7 +439,6 @@ if __name__=="__main__":
         if topic.lower() == "exit":
             p_queue.close()
             break
-
         personalities = dm.get_personalities(topic, LLM )
         print(personalities)
 
@@ -434,17 +447,12 @@ if __name__=="__main__":
         
 
         
-        
         p = multiprocessing.Process(target=speak, args=(p_queue, dm.agents,topic))
         processes.append(p)
         p.start()
-
         dialogue = dm.get_dialogue(topic, LLM_DIALOGUE)
-        
         join_procs(processes)
-
-
-    p_queue.close()
+        p_queue.close()
         
 
 

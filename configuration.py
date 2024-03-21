@@ -10,10 +10,10 @@ LINE_WAIT = 0.6
 
 language = "dutch"
 
-#172.22.160.1
-#192.168.0.164
+# 172.22.160.1
+#192.168.0.118
 
-furhat_hosts = ["192.168.140.115", "192.168.140.59"]
+furhat_hosts = ["172.22.160.1", "192.168.0.118"]
 furhat_listening_coordinates = [ "0.1,0.0,0.3", "-0.1, 0.0, 0.3"]
 
 furhat_listening_animations = ["BrowRaise", "BrowFrown", "Nod", "OpenEyes", "Shake", "Roll", "Thoughtful", "GazeAway"]
@@ -21,6 +21,9 @@ furhat_listening_animations = ["BrowRaise", "BrowFrown", "Nod", "OpenEyes", "Sha
 furhat_idle_animations = [  "Nod" , "Roll", "Thoughtful"]
 
 endpoint = "https://echoweb.hri.ilabt.imec.be/api/fti"
+
+requests=False
+use_bots = False
 
 
 

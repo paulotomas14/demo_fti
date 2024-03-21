@@ -5,12 +5,13 @@ VOICES = { "dutch": {
 "english": {'female': 
   [
       {'language': 'en-US', 'name': 'Kimberly'},
+      {'language': 'en-US', 'name': 'Salli'},
 ], 
 
 'male' : [ 
 
  {'language': 'en-US', 'name': 'Joey'},
-
+    {'language': 'en-US', 'name': 'Matthew'},
  ]
 }}
     
