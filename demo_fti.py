@@ -31,28 +31,10 @@ import requests
 from colorama import Fore,Style
 
 from callback_handler import CustomStreamingStdOutCallbackHandler
-VERBOSE = False
-TIMEOUT = 10
-discussion_floor = 20
-discussion_ceil = 30
-IDLE_MIN = 1
-IDLE_MAX = 3
-LISTEN_MIN = 1
-LISTEN_MAX = 3
 
-language = "english"
-
-#172.22.160.1
-#192.168.0.164
-
-furhat_hosts = ["192.168.140.115", "192.168.140.59"]
-furhat_listening_coordinates = [ "0.1,0.0,0.3", "-0.1, 0.0, 0.3"]
-
-furhat_listening_animations = ["BrowRaise", "BrowFrown", "Nod", "OpenEyes", "Shake", "Roll", "Thoughtful", "GazeAway"]
-
-furhat_idle_animations = [  "Nod" , "Roll", "Thoughtful"]
-
-endpoint = "https://echoweb.hri.ilabt.imec.be/api/fti"
+from configuration import VERBOSE, TIMEOUT, discussion_floor, discussion_ceil
+from configuration import IDLE_MIN, IDLE_MAX, LISTEN_MIN, LISTEN_MAX, LINE_WAIT
+from configuration import language, furhat_hosts, furhat_listening_coordinates, furhat_listening_animations , furhat_idle_animations , endpoint 
 
 
 
@@ -321,7 +303,7 @@ def speak(p_queue, agents, topic):
 
                     #print(ag["voice"])
 
-                    time.sleep(0.6)
+                    time.sleep(LINE_WAIT)
                     led_flicker(furhat)
                     furhat.set_voice(name=ag["voice"])
                     furhat.set_face(character=ag["face"], mask="adult")
@@ -421,10 +403,10 @@ if __name__=="__main__":
     
     get_env_vars()
     #gpt-3.5-turbo
-    LLM_DIALOGUE = ChatOpenAI(temperature=0.9, max_tokens=2000, verbose = False, model_name='gpt-3.5-turbo', request_timeout = TIMEOUT, streaming=True,  # ! important
+    LLM_DIALOGUE = ChatOpenAI(temperature=0.9, max_tokens=2000, verbose = VERBOSE, model_name='gpt-3.5-turbo', request_timeout = TIMEOUT, streaming=True,  # ! important
         callbacks=[CustomStreamingStdOutCallbackHandler()] )# Can be any LLM you want.
     
-    LLM = ChatOpenAI(temperature=0.9, max_tokens=4096, verbose = False, model_name='gpt-3.5-turbo', request_timeout = TIMEOUT)# Can be any LLM you want.
+    LLM = ChatOpenAI(temperature=0.9, max_tokens=4096, verbose = VERBOSE, model_name='gpt-3.5-turbo', request_timeout = TIMEOUT)# Can be any LLM you want.
     dm = DialogueManager()
     p_queue = multiprocessing.Queue()
     dm.p_queue = p_queue

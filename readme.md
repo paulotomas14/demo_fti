@@ -5,5 +5,6 @@ installation:
         3. python demo_fti.py
 
     docker:
-        docker build -t paulo/gen_agents_native_demo:1.0 .
-        docker run paulo/gen_agents_native_demo:1.0
+        1. Start your Docker engine
+        2. docker build -t paulo/demo_fti:1.0 .
+        3. docker run -it paulo/demo_fti:1.0
