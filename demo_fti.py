@@ -33,7 +33,7 @@ from colorama import Fore,Style
 from callback_handler import CustomStreamingStdOutCallbackHandler
 
 from configuration import VERBOSE, TIMEOUT, discussion_floor, discussion_ceil, use_bots
-from configuration import IDLE_MIN, IDLE_MAX, LISTEN_MIN, LISTEN_MAX, LINE_WAIT
+from configuration import IDLE_MIN, IDLE_MAX, LISTEN_MIN, LISTEN_MAX, LINE_WAIT, MODE
 from configuration import language, furhat_hosts, furhat_listening_coordinates, furhat_listening_animations , furhat_idle_animations , endpoint 
 
 
@@ -133,37 +133,38 @@ END OF EXAMPLE"""
 
         return res, start, agent
 
-    def get_dialogue(self, topic, llm):
-    
+    def get_dialogue(self, topic, llm, mode):
+        
+
+        if mode == "polite":
+            prompt_variables = ["polite", "polite", "polite", "spirited", "spirited", "polite", "polite", "lighthearted" ]
+        elif mode == "rude":
+            prompt_variables = ["rude", "sarcastic", "sarcastic", "heated", "heated", "rude", "rude", "confrontational" ]
+
         agent_list = list(self.agents.items())
         #print(agent_list[0])
         agent_1 = agent_list[0][0]
         agent_2 = agent_list[1][0]
         input = f"""A debate for the ages. On "{topic}", two heavy hiters will debate: {agent_1} and {agent_2}.
-    Write a rude discussion between these two personalities, as if they were having it right now. 
+    Write a {prompt_variables[0]} discussion between these two personalities, as if they were having it right now. 
     They must be consistent with their real beliefs, and defend oposing views.
-    They must confront each other's their ideas. Do not paraphrase or address 
+    They must confront each other's ideas. Do not paraphrase or address 
     the participants by their names, use pronouns instead.
     You must provide this debate in the following format:
-    {agent_1} : sarcastic greeting(a polite introduction).
-    {agent_2} : sarcastic greeting(a polite introduction).
+    {agent_1} : {prompt_variables[1]} greeting(a polite introduction).
+    {agent_2} : {prompt_variables[2]} greeting(a polite introduction).
     from {discussion_floor} to {discussion_ceil} times:
-        {agent_1} : heated argument(at most 20 words).
-        {agent_2} : heated argument(at most 20 words).
-    {agent_1} : rude greeting(a goodbye).
-    {agent_2} : rude greeting(a goodbye).
+        {agent_1} : {prompt_variables[3]} argument(at most 20 words).
+        {agent_2} : {prompt_variables[4]} argument(at most 20 words).
+    {agent_1} : {prompt_variables[5]} greeting(a goodbye).
+    {agent_2} : {prompt_variables[6]} greeting(a goodbye).
     The arguments must flow coherently from one to the next. 
     The debate must be informative, and interesting. 
     """
         if language.lower()=="dutch":
-            input+= "Please write this debate in dutch language, in a lighthearted style.\n"
+            input+= f"Please write this debate in dutch language, in a {prompt_variables[7]} style.\n"
 
-        '''
-        Write it in the style of Aaron Sorkin.
-        If repetition might be an issue, veer the debate into recent issues an thematics,
-        To keep the conversation flow.
-        Terminate the debate only once both parties have agreed, or agreed to disagree, 
-        '''
+        
         chunks = []
         res = ""
         agent_name = ""
@@ -306,21 +307,21 @@ def speak(llm, p_queue, agents, topic):
 
                     furhat = ag.get("furhat")
                     opposing_furhat = opposing_ag.get("furhat")
+
+        
                     if furhat and opposing_furhat:
 
                         if start_conversation_flag:
                             furhat.set_voice(name=ag["voice"])
                             furhat.set_face(character=ag["face"], mask="adult")
+                            opposing_furhat.set_face(character=opposing_ag["face"], mask="adult")
                             opposing_furhat.set_voice(name= opposing_ag["voice"])
-                            opposing_furhat.set_face(character= opposing_ag["face"],  mask="adult")
                             start_conversation_flag = False
-
 
                         opposing_furhat.set_led(red=0, green=0, blue=0)
                         opposing_furhat.attend(location=opposing_ag["list_coords"])
 
 
-                        #print(ag["voice"])
 
                         time.sleep(LINE_WAIT)
                         led_flicker(furhat, ag["color"])
@@ -343,7 +344,6 @@ def speak(llm, p_queue, agents, topic):
                                 print("NO HTTP SERVER")
                         print(Fore.BLUE + ag_name + " : " + line, end="", flush=True)
                         print(Style.RESET_ALL)
-                        
                         furhat.say(text=line, blocking=True)
 
                         terminate_procs(procs)
@@ -404,13 +404,13 @@ def evaluate_line(llm, personality, opponent, line):
         
        
     res = llm.invoke(input).content
+    #print("RESULT = " + str(res))
 
-
-    regex = r"Final\s+Answer\s*:\s*(.*)\(\s*([Aa][Gg][Rr][Ee][Ee]|[Dd][Ii][Ss][Aa][Gg][Rr][Ee][Ee]|[Cc][Oo][Nn][Ss][Ii][Dd][Ee][Rr])\s*\)(.*)"
+    regex = r"Final\s+Answer\s*:\s*([Aa][Gg][Rr][Ee][Ee]|[Dd][Ii][Ss][Aa][Gg][Rr][Ee][Ee]|[Cc][Oo][Nn][Ss][Ii][Dd][Ee][Rr]).*"
 
     match = re.search(regex, res, flags=re.DOTALL)
     if match:
-        return match.group(2).strip().lower()
+        return match.group(1).strip().lower()
     else:
         return "consider"
 
@@ -499,7 +499,7 @@ if __name__=="__main__":
         p = multiprocessing.Process(target=speak, args=(LLM_DIALOGUE, p_queue, dm.agents,topic, ))
         processes.append(p)
         p.start()
-        dialogue = dm.get_dialogue(topic, LLM_DIALOGUE)
+        dialogue = dm.get_dialogue(topic, LLM_DIALOGUE, MODE)
         join_procs(processes)
         p_queue.close()
         if requests:

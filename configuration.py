@@ -9,11 +9,12 @@ LISTEN_MAX = 3
 LINE_WAIT = 0.2
 
 language = "english"
+MODE = "rude"
 
 # 172.22.160.1
 #192.168.0.118
 
-furhat_hosts = ["192.168.140.115", "192.168.140.59"]
+furhat_hosts = ["192.168.0.164", "192.168.0.118"]
 furhat_listening_coordinates = [ "0.1,0.0,0.3", "-0.1, 0.0, 0.3"]
 
 #group by emotion type: brow_frown, shake, gaze_away - disagree
