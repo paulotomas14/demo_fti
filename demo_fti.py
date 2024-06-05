@@ -140,18 +140,18 @@ END OF EXAMPLE"""
         agent_1 = agent_list[0][0]
         agent_2 = agent_list[1][0]
         input = f"""A debate for the ages. On "{topic}", two heavy hiters will debate: {agent_1} and {agent_2}.
-    Write a fun discussion between these two personalities, as if they were having it right now. 
+    Write a rude discussion between these two personalities, as if they were having it right now. 
     They must be consistent with their real beliefs, and defend oposing views.
     They must confront each other's their ideas. Do not paraphrase or address 
     the participants by their names, use pronouns instead.
     You must provide this debate in the following format:
-    {agent_1} : greeting(a polite introduction).
-    {agent_2} : greeting(a polite introduction).
+    {agent_1} : sarcastic greeting(a polite introduction).
+    {agent_2} : sarcastic greeting(a polite introduction).
     from {discussion_floor} to {discussion_ceil} times:
-        {agent_1} : argument(at most 20 words).
-        {agent_2} : argument(at most 20 words).
-    {agent_1} : greeting(a polite goodbye).
-    {agent_2} : greeting(a polite goodbye).
+        {agent_1} : heated argument(at most 20 words).
+        {agent_2} : heated argument(at most 20 words).
+    {agent_1} : rude greeting(a goodbye).
+    {agent_2} : rude greeting(a goodbye).
     The arguments must flow coherently from one to the next. 
     The debate must be informative, and interesting. 
     """
@@ -280,7 +280,7 @@ def led_flicker(furhat, color):
     furhat.set_led(red=color[0], green=color[1], blue=color[2])
 
 
-def speak(p_queue, agents, topic):
+def speak(llm, p_queue, agents, topic):
 
     line = "something"
     if requests:
@@ -288,7 +288,7 @@ def speak(p_queue, agents, topic):
             clear_screen_http_req()
         except Exception:
             print("NO HTTP SERVER")
-
+    start_conversation_flag = True
 
     while line != None:
         dialogue = p_queue.get()
@@ -301,12 +301,21 @@ def speak(p_queue, agents, topic):
             opposing_ag = agents.get(ag_opposing_name)
             if use_bots:
                 if ag and opposing_ag:
+                    
+
+
                     furhat = ag.get("furhat")
                     opposing_furhat = opposing_ag.get("furhat")
                     if furhat and opposing_furhat:
-                        
-                        opposing_furhat.set_voice(name= opposing_ag["voice"])
-                        opposing_furhat.set_face(character= opposing_ag["face"],  mask="adult")
+
+                        if start_conversation_flag:
+                            furhat.set_voice(name=ag["voice"])
+                            furhat.set_face(character=ag["face"], mask="adult")
+                            opposing_furhat.set_voice(name= opposing_ag["voice"])
+                            opposing_furhat.set_face(character= opposing_ag["face"],  mask="adult")
+                            start_conversation_flag = False
+
+
                         opposing_furhat.set_led(red=0, green=0, blue=0)
                         opposing_furhat.attend(location=opposing_ag["list_coords"])
 
@@ -315,13 +324,14 @@ def speak(p_queue, agents, topic):
 
                         time.sleep(LINE_WAIT)
                         led_flicker(furhat, ag["color"])
-                        furhat.set_voice(name=ag["voice"])
-                        furhat.set_face(character=ag["face"], mask="adult")
+                        
                         furhat.attend(location=ag["list_coords"])
 
                         procs = []
 
-                        p = multiprocessing.Process(target=listening, args=(opposing_furhat,))
+                        #params: furhat,personality, llm, opponent, line
+
+                        p = multiprocessing.Process(target=listening, args=(opposing_furhat, ag_name, llm, ag_opposing_name, line))
                         procs.append(p)
                         p.start()
 
@@ -343,9 +353,10 @@ def speak(p_queue, agents, topic):
                 print(Style.RESET_ALL)
 
 def play_idle_animations(furhat):
+
+
     time.sleep(random.randint(IDLE_MIN,IDLE_MAX))
     
-
     choice = random.randint(0,1)
 
     if choice == 1:
@@ -353,10 +364,12 @@ def play_idle_animations(furhat):
     else:
         furhat.gesture(name=random.choice(furhat_idle_animations))
 
-def play_listening_animations(furhat):
+
+
+def play_listening_animations(evaluation, furhat):
     time.sleep(random.randint(LISTEN_MIN,LISTEN_MAX))
 
-    furhat.gesture(name=random.choice(furhat_listening_animations))
+    furhat.gesture(name=random.choice(furhat_listening_animations.get(evaluation)))
 
 
         
@@ -372,11 +385,47 @@ def idle():
             play_idle_animations(furhat)
 
 
-def listening(furhat):
+
+
+def evaluate_line(llm, personality, opponent, line):
     
+    #  "BrowRaise", "BrowFrown", "Nod", "OpenEyes", "Shake", "Roll", "Thoughtful", "GazeAway"
+
+    #group by emotion type: brow_frown, shake, gaze_away - disagree
+    # brow_raise, roll, thoughtfull - considering
+    # Nod, Open eyes - agree
+
+
+    input = f"""As {personality}, do you agree, disagree, or want to further consider the idea put forth by {opponent}, when they told you:
+    {line}?
+    Respond in the following format:
+    Final Answer: Agree/Disagree/Consider
+    """
+        
+       
+    res = llm.invoke(input).content
+
+
+    regex = r"Final\s+Answer\s*:\s*(.*)\(\s*([Aa][Gg][Rr][Ee][Ee]|[Dd][Ii][Ss][Aa][Gg][Rr][Ee][Ee]|[Cc][Oo][Nn][Ss][Ii][Dd][Ee][Rr])\s*\)(.*)"
+
+    match = re.search(regex, res, flags=re.DOTALL)
+    if match:
+        return match.group(2).strip().lower()
+    else:
+        return "consider"
+
+
+
+
+
+
+
+def listening(furhat,personality, llm, opponent, line):
     
+
+    evaluation = evaluate_line(llm, personality, opponent, line)
     while True:
-        play_listening_animations(furhat)
+        play_listening_animations(evaluation, furhat)
 
     
 
@@ -419,7 +468,7 @@ if __name__=="__main__":
     LLM_DIALOGUE = ChatOpenAI(temperature=0.9, max_tokens=2000, verbose = VERBOSE, model_name='gpt-3.5-turbo', request_timeout = TIMEOUT, streaming=True,  # ! important
         callbacks=[CustomStreamingStdOutCallbackHandler()] )# Can be any LLM you want.
     
-    LLM = ChatOpenAI(temperature=0.9, max_tokens=4096, verbose = VERBOSE, model_name='gpt-3.5-turbo', request_timeout = TIMEOUT)# Can be any LLM you want.
+    LLM = ChatOpenAI(temperature=0.9, max_tokens=2000, verbose = VERBOSE, model_name='gpt-3.5-turbo', request_timeout = TIMEOUT)# Can be any LLM you want.
     
 
     topic = ""
@@ -445,14 +494,20 @@ if __name__=="__main__":
         for i, personality in enumerate(personalities):
             dm.agents.update(dm.get_agent(i, personality))
         
-
+        print(dm.agents)
         
-        p = multiprocessing.Process(target=speak, args=(p_queue, dm.agents,topic))
+        p = multiprocessing.Process(target=speak, args=(LLM_DIALOGUE, p_queue, dm.agents,topic, ))
         processes.append(p)
         p.start()
         dialogue = dm.get_dialogue(topic, LLM_DIALOGUE)
         join_procs(processes)
         p_queue.close()
+        if requests:
+            try:
+                clear_screen_http_req()
+            except Exception:
+                print("NO HTTP SERVER")
+        dm.agents = {}
         
 
 

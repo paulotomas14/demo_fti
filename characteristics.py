@@ -1,6 +1,6 @@
 VOICES = { "dutch": {
     'female': [ {'language': 'nl-BE', 'name': 'Lisa-Neural'}], 
-    'male': [{'language': 'nl-BE', 'name': 'ArnaudNeural'},]
+    'male': [{'language': 'nl-NL', 'name': 'Ruben'},]
     },  
 "english": {'female': 
   [
@@ -14,7 +14,7 @@ VOICES = { "dutch": {
     {'language': 'en-US', 'name': 'Matthew'},
  ]
 }}
-    
+#{'language': 'nl-BE', 'name': 'ArnaudNeural'}
 
  
 FACES = { "female" : [ "Kione", "Isabel", "Alex"], "male": ["Brooklyn", "James"]}
